@@ -20,7 +20,15 @@ builder.Services.AddDbContext<TrackingDbContext>(options =>
 builder.Services.AddScoped<TrackingEventHandler>();
 builder.Services.AddSingleton<TrackingStatusTransitionPolicy>();
 
-builder.Services.AddScoped<ITrackingRepository, TrackingRepository>();
+var useMockTrackingRepository = builder.Configuration.GetValue<bool>(MockTrackingRepositoryOptions.SectionName + ":Enabled");
+if (useMockTrackingRepository)
+{
+    builder.Services.AddScoped<ITrackingRepository, MockTrackingRepository>();
+}
+else
+{
+    builder.Services.AddScoped<ITrackingRepository, TrackingRepository>();
+}
 builder.Services.AddScoped<IOutboxWriter, OutboxWriter>();
 
 builder.Services.AddSingleton<ITrackingMessageConsumer, KafkaTrackingMessageConsumer>();

@@ -20,6 +20,13 @@ public sealed class TrackingRepository : ITrackingRepository
             .SingleOrDefaultAsync(x => x.ShipmentId == shipmentId, cancellationToken);
     }
 
+    public Task<ShipmentTracking?> GetShipmentTrackingByTrackingCodeAsync(string trackingCode, CancellationToken cancellationToken)
+    {
+        return _dbContext.ShipmentTrackings
+            .AsNoTracking()
+            .SingleOrDefaultAsync(x => x.TrackingCode == trackingCode, cancellationToken);
+    }
+
     public async Task<IReadOnlyList<TrackingEvent>> GetTrackingEventsAsync(
         Guid shipmentId,
         int limit,
