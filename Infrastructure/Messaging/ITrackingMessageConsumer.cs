@@ -13,4 +13,5 @@ public sealed record ConsumedTrackingMessage(
     string Topic,
     int Partition,
     long Offset,
+    string CorrelationId,
     CarrierTrackingEventIntegrationEvent Event);

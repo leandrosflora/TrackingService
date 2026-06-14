@@ -116,7 +116,7 @@ Contém detalhes técnicos:
 - `ITrackingMessageConsumer`, `KafkaTrackingMessageConsumer`: abstração e implementação atual do consumidor de eventos.
 - `IIntegrationEventBus`, `KafkaIntegrationEventBus`: abstração e implementação atual de publicação.
 
-> Observação: as classes `KafkaTrackingMessageConsumer` e `KafkaIntegrationEventBus` estão implementadas como placeholders/loggers. A integração real com Kafka ainda precisa ser conectada a um client Kafka.
+> Observação: as classes `KafkaTrackingMessageConsumer` e `KafkaIntegrationEventBus` usam `Confluent.Kafka` para consumir e publicar eventos reais, mantendo as abstrações para desenvolvimento local e testes end-to-end.
 
 #### `Api`
 
@@ -629,9 +629,9 @@ O health check inclui uma verificação do `TrackingDbContext`, validando a capa
 
 Os logs seguem a configuração padrão do ASP.NET Core. Alguns pontos de log relevantes:
 
-- `KafkaTrackingMessageConsumer`: início do consumidor placeholder, commits e nacks.
+- `KafkaTrackingMessageConsumer`: consumo real de Kafka, commits e nacks.
 - `TrackingConsumerWorker`: erro ao processar evento de rastreamento.
-- `KafkaIntegrationEventBus`: publicação placeholder de eventos.
+- `KafkaIntegrationEventBus`: publicação real de eventos no Kafka.
 - `OutboxDispatcher`: falhas ao publicar mensagens da Outbox.
 
 ## Mensageria, Inbox e Outbox
@@ -649,9 +649,9 @@ Fluxo:
 5. Executa `CommitAsync` em caso de sucesso.
 6. Executa `NackAsync` em caso de exceção.
 
-### Placeholder Kafka
+### Integração Kafka
 
-A classe `KafkaTrackingMessageConsumer` ainda não consome Kafka de verdade. Ela apenas registra log de inicialização e mantém o worker vivo com delay periódico até o cancelamento.
+A classe `KafkaTrackingMessageConsumer` consome Kafka de verdade via `Confluent.Kafka`, assina o tópico `shipment.created` e confirma offsets apenas após o processamento pelo `TrackingConsumerWorker`.
 
 Para produção, é necessário implementar:
 
@@ -734,16 +734,14 @@ Depois execute novamente a aplicação.
 
 ### Eventos não são consumidos de Kafka
 
-A implementação atual de Kafka é placeholder. É esperado que nenhum evento real seja consumido até a implementação do client Kafka.
+Verifique se o broker está exposto em `localhost:9092`, se o tópico `shipment.created` existe e se o grupo `tracking-service` aparece no Kafka UI.
 
 ### Outbox não publica para broker real
 
-`KafkaIntegrationEventBus` também é placeholder e registra logs em vez de publicar em Kafka de verdade.
+`KafkaIntegrationEventBus` publica no Kafka de verdade; se não houver mensagens em `shipment.status.updated`, verifique os logs do `OutboxDispatcher`, a conectividade com o broker e registros pendentes em `outbox_messages`.
 
 ## Roadmap técnico sugerido
 
-- Implementar consumidor Kafka real.
-- Implementar publisher Kafka real para a Outbox.
 - Adicionar migrations EF Core versionadas.
 - Adicionar testes unitários para `TrackingStatusTransitionPolicy`.
 - Adicionar testes de integração para `TrackingEventHandler` com banco real ou Testcontainers.
@@ -755,3 +753,94 @@ A implementação atual de Kafka é placeholder. É esperado que nenhum evento r
 ## Licença
 
 A licença do projeto ainda não está definida neste repositório. Adicione um arquivo `LICENSE` e atualize esta seção conforme a política da organização.
+
+## Integração Kafka local
+
+Este serviço usa `Confluent.Kafka` para integração real com o broker Kafka da solução Meli Envios, mantendo as abstrações existentes (`ITrackingMessageConsumer`, `IIntegrationEventBus`, `TrackingConsumerWorker` e `OutboxDispatcher`).
+
+### Configuração
+
+A configuração padrão para execução local está em `appsettings.json` e `appsettings.Development.json`:
+
+```json
+{
+  "Kafka": {
+    "BootstrapServers": "localhost:9092",
+    "ConsumerGroupId": "tracking-service",
+    "Topics": {
+      "ShipmentCreated": "shipment.created",
+      "ShipmentStatusUpdated": "shipment.status.updated"
+    }
+  }
+}
+```
+
+> Use `localhost:9092` como broker para microservices rodando fora do Docker. A Kafka UI em `http://localhost:8088` é apenas a interface de inspeção e não deve ser usada como broker.
+
+### Eventos Kafka suportados
+
+- Consumo: `shipment.created`.
+- Publicação via Outbox: `shipment.status.updated`.
+
+As mensagens usam o envelope canônico:
+
+```json
+{
+  "eventId": "00000000-0000-0000-0000-000000000000",
+  "eventType": "shipment.created",
+  "schemaVersion": "1.0",
+  "occurredAt": "2026-06-14T12:00:00Z",
+  "correlationId": "local-e2e-001",
+  "producer": "shipment-service",
+  "payload": {}
+}
+```
+
+### Teste end-to-end local
+
+1. Suba a infraestrutura do repositório de arquitetura, garantindo que o broker esteja exposto em `localhost:9092` e a Kafka UI em `http://localhost:8088`.
+2. Restaure e compile o serviço:
+
+```bash
+dotnet restore
+dotnet build
+dotnet test
+```
+
+3. Execute o serviço:
+
+```bash
+dotnet run --project TrackingService.csproj
+```
+
+4. Publique um evento `shipment.created` no tópico `shipment.created` com key igual ao `shipmentId`:
+
+```json
+{
+  "eventId": "11111111-1111-1111-1111-111111111111",
+  "eventType": "shipment.created",
+  "schemaVersion": "1.0",
+  "occurredAt": "2026-06-14T12:00:00Z",
+  "correlationId": "local-e2e-001",
+  "producer": "shipment-service",
+  "payload": {
+    "shipmentId": "22222222-2222-2222-2222-222222222222",
+    "trackingCode": "MLB-E2E-TRACKING",
+    "carrierCode": "MELI",
+    "estimatedDeliveryDate": "2026-06-18",
+    "createdAt": "2026-06-14T12:00:00Z"
+  }
+}
+```
+
+5. O consumer cria a projeção inicial de tracking com status `Created`. Quando a projeção é criada ou atualizada, o `OutboxDispatcher` publica `shipment.status.updated` no Kafka.
+
+### Validação no Kafka UI
+
+Abra `http://localhost:8088` e verifique:
+
+- O tópico `shipment.created` contém o evento publicado para o teste.
+- O grupo consumidor `tracking-service` avançou offset no tópico `shipment.created`.
+- O tópico `shipment.status.updated` recebeu evento com envelope canônico, `eventType` igual a `shipment.status.updated`, key igual ao `shipmentId` e o mesmo `correlationId` do evento consumido.
+
+Os logs do serviço informam `topic`, `message key`, `eventType` e `correlationId` no consumo e na publicação.
