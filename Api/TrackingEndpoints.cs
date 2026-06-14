@@ -1,6 +1,5 @@
-using Microsoft.EntityFrameworkCore;
+using TrackingService.Application.Ports;
 using TrackingService.Contracts;
-using TrackingService.Infrastructure.Persistence;
 
 namespace TrackingService.Api;
 
@@ -12,24 +11,20 @@ public static class TrackingEndpoints
 
         group.MapGet("/shipments/{shipmentId:guid}", async (
             Guid shipmentId,
-            TrackingDbContext dbContext,
+            ITrackingRepository repository,
             CancellationToken cancellationToken) =>
         {
-            var tracking = await dbContext.ShipmentTrackings
-                .AsNoTracking()
-                .SingleOrDefaultAsync(x => x.ShipmentId == shipmentId, cancellationToken);
+            var tracking = await repository.GetShipmentTrackingAsync(shipmentId, cancellationToken);
 
             return tracking is null ? Results.NotFound() : Results.Ok(MapTracking(tracking));
         });
 
         group.MapGet("/{trackingCode}", async (
             string trackingCode,
-            TrackingDbContext dbContext,
+            ITrackingRepository repository,
             CancellationToken cancellationToken) =>
         {
-            var tracking = await dbContext.ShipmentTrackings
-                .AsNoTracking()
-                .SingleOrDefaultAsync(x => x.TrackingCode == trackingCode, cancellationToken);
+            var tracking = await repository.GetShipmentTrackingByTrackingCodeAsync(trackingCode, cancellationToken);
 
             return tracking is null ? Results.NotFound() : Results.Ok(MapTracking(tracking));
         });
@@ -38,38 +33,12 @@ public static class TrackingEndpoints
             Guid shipmentId,
             int? limit,
             DateTimeOffset? before,
-            TrackingDbContext dbContext,
+            ITrackingRepository repository,
             CancellationToken cancellationToken) =>
         {
-            var pageSize = Math.Clamp(limit ?? 50, 1, 100);
-            var query = dbContext.TrackingEvents
-                .AsNoTracking()
-                .Where(x => x.ShipmentId == shipmentId);
+            var events = await repository.GetTrackingEventsAsync(shipmentId, limit ?? 50, before, cancellationToken);
 
-            if (before.HasValue)
-                query = query.Where(x => x.OccurredAt < before.Value);
-
-            var events = await query
-                .OrderByDescending(x => x.OccurredAt)
-                .ThenByDescending(x => x.ReceivedAt)
-                .Take(pageSize)
-                .Select(x => new TrackingEventResponse(
-                    x.Id,
-                    x.Status,
-                    x.Description,
-                    x.ExceptionCode,
-                    x.Location == null
-                        ? null
-                        : new TrackingLocationDto(
-                            x.Location.FacilityCode,
-                            x.Location.City,
-                            x.Location.State,
-                            x.Location.Country),
-                    x.OccurredAt,
-                    x.ReceivedAt))
-                .ToListAsync(cancellationToken);
-
-            return Results.Ok(events);
+            return Results.Ok(events.Select(MapTrackingEvent));
         });
 
         return app;
@@ -93,5 +62,23 @@ public static class TrackingEndpoints
             tracking.EstimatedDeliveryDate,
             tracking.DeliveredAt,
             tracking.CurrentExceptionCode);
+    }
+
+    private static TrackingEventResponse MapTrackingEvent(Domain.TrackingEvent trackingEvent)
+    {
+        return new TrackingEventResponse(
+            trackingEvent.Id,
+            trackingEvent.Status,
+            trackingEvent.Description,
+            trackingEvent.ExceptionCode,
+            trackingEvent.Location is null
+                ? null
+                : new TrackingLocationDto(
+                    trackingEvent.Location.FacilityCode,
+                    trackingEvent.Location.City,
+                    trackingEvent.Location.State,
+                    trackingEvent.Location.Country),
+            trackingEvent.OccurredAt,
+            trackingEvent.ReceivedAt);
     }
 }
