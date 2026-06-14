@@ -7,6 +7,8 @@ public sealed record CarrierTrackingEventIntegrationEvent(
     string CorrelationId,
     string ProviderEventId,
     Guid ShipmentId,
+    Guid OrderId,
+    Guid BuyerId,
     string TrackingCode,
     string CarrierCode,
     long? CarrierSequence,

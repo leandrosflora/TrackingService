@@ -23,6 +23,8 @@ public sealed class TrackingDbContext : DbContext
             entity.HasKey(x => x.Id);
             entity.Property(x => x.Id).HasColumnName("id");
             entity.Property(x => x.ShipmentId).HasColumnName("shipment_id");
+            entity.Property(x => x.OrderId).HasColumnName("order_id");
+            entity.Property(x => x.BuyerId).HasColumnName("buyer_id");
             entity.Property(x => x.ProviderEventId).HasColumnName("provider_event_id").HasMaxLength(200).IsRequired();
             entity.Property(x => x.TrackingCode).HasColumnName("tracking_code").HasMaxLength(200).IsRequired();
             entity.Property(x => x.CarrierCode).HasColumnName("carrier_code").HasMaxLength(80).IsRequired();
@@ -51,6 +53,8 @@ public sealed class TrackingDbContext : DbContext
             entity.ToTable("shipment_tracking");
             entity.HasKey(x => x.ShipmentId);
             entity.Property(x => x.ShipmentId).HasColumnName("shipment_id");
+            entity.Property(x => x.OrderId).HasColumnName("order_id");
+            entity.Property(x => x.BuyerId).HasColumnName("buyer_id");
             entity.Property(x => x.TrackingCode).HasColumnName("tracking_code").HasMaxLength(200).IsRequired();
             entity.HasIndex(x => x.TrackingCode).IsUnique();
             entity.Property(x => x.CarrierCode).HasColumnName("carrier_code").HasMaxLength(80).IsRequired();

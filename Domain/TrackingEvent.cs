@@ -4,6 +4,8 @@ public sealed class TrackingEvent
 {
     public Guid Id { get; private set; }
     public Guid ShipmentId { get; private set; }
+    public Guid OrderId { get; private set; }
+    public Guid BuyerId { get; private set; }
     public string ProviderEventId { get; private set; } = default!;
     public string TrackingCode { get; private set; } = default!;
     public string CarrierCode { get; private set; } = default!;
@@ -22,6 +24,8 @@ public sealed class TrackingEvent
 
     public TrackingEvent(
         Guid shipmentId,
+        Guid orderId,
+        Guid buyerId,
         string providerEventId,
         string trackingCode,
         string carrierCode,
@@ -37,6 +41,12 @@ public sealed class TrackingEvent
         if (shipmentId == Guid.Empty)
             throw new ArgumentException("ShipmentId is required", nameof(shipmentId));
 
+        if (orderId == Guid.Empty)
+            throw new ArgumentException("OrderId is required", nameof(orderId));
+
+        if (buyerId == Guid.Empty)
+            throw new ArgumentException("BuyerId is required", nameof(buyerId));
+
         if (string.IsNullOrWhiteSpace(providerEventId))
             throw new ArgumentException("ProviderEventId is required", nameof(providerEventId));
 
@@ -48,6 +58,8 @@ public sealed class TrackingEvent
 
         Id = Guid.NewGuid();
         ShipmentId = shipmentId;
+        OrderId = orderId;
+        BuyerId = buyerId;
         ProviderEventId = providerEventId;
         TrackingCode = trackingCode;
         CarrierCode = carrierCode.Trim().ToUpperInvariant();

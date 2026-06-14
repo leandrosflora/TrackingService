@@ -407,62 +407,76 @@ curl "http://localhost:5200/tracking/shipments/11111111-1111-1111-1111-111111111
 
 ## Contratos de integração
 
-### Evento recebido: `CarrierTrackingEventIntegrationEvent`
+O `TrackingService` consome o contrato canônico Kafka `shipment.created` e publica o contrato canônico `shipment.status.updated` usando o envelope padrão (`eventId`, `eventType`, `schemaVersion`, `occurredAt`, `correlationId`, `producer`, `payload`). O `correlationId` recebido em `shipment.created` é preservado no processamento e na mensagem publicada para rastreabilidade entre serviços.
 
-Contrato usado para representar um evento recebido da transportadora.
+`orderId` e `buyerId` são obrigatórios nos dois contratos: o `OrderService` usa `orderId` para localizar e atualizar o pedido associado à remessa, enquanto o `NotificationService` usa `buyerId` para planejar notificações ao comprador sem inferir identidade a partir de outro domínio.
+
+### Evento recebido: `shipment.created`
+
+Payload canônico consumido pelo `KafkaTrackingMessageConsumer`:
+
+```json
+{
+  "shipmentId": "11111111-1111-1111-1111-111111111111",
+  "orderId": "22222222-2222-2222-2222-222222222222",
+  "buyerId": "33333333-3333-3333-3333-333333333333",
+  "carrierCode": "carrier_1",
+  "serviceLevelCode": "same_day",
+  "externalShipmentId": "ext_123",
+  "trackingCode": "BR123456789",
+  "labelObjectKey": "labels/shp_123.pdf",
+  "estimatedDeliveryDate": "2026-06-15",
+  "createdAt": "2026-06-14T12:00:00Z"
+}
+```
+
+O consumidor valida `eventType == "shipment.created"`, desserializa `orderId` e `buyerId`, e transforma a criação da remessa em um `CarrierTrackingEventIntegrationEvent` interno com status inicial `Created`.
+
+### Evento interno: `CarrierTrackingEventIntegrationEvent`
+
+Contrato usado dentro do serviço para representar um evento de tracking normalizado antes de atualizar a projeção e a Outbox.
 
 ```json
 {
   "messageId": "33333333-3333-3333-3333-333333333333",
-  "providerEventId": "provider-event-123",
+  "correlationId": "corr-123",
+  "providerEventId": "shipment.created:33333333333333333333333333333333",
   "shipmentId": "11111111-1111-1111-1111-111111111111",
+  "orderId": "22222222-2222-2222-2222-222222222222",
+  "buyerId": "33333333-3333-3333-3333-333333333333",
   "trackingCode": "BR123456789",
-  "carrierCode": "correios",
-  "carrierSequence": 10,
-  "status": "InTransit",
-  "description": "Objeto em trânsito",
+  "carrierCode": "carrier_1",
+  "carrierSequence": 0,
+  "status": "Created",
+  "description": "Shipment created.",
   "exceptionCode": null,
-  "location": {
-    "facilityCode": "CDD-SP-01",
-    "city": "São Paulo",
-    "state": "SP",
-    "country": "BR"
-  },
-  "occurredAt": "2026-06-10T10:15:00+00:00",
-  "receivedAt": "2026-06-10T10:16:00+00:00",
-  "estimatedDeliveryDate": "2026-06-12"
+  "location": null,
+  "occurredAt": "2026-06-14T12:00:00Z",
+  "receivedAt": "2026-06-14T12:00:05Z",
+  "estimatedDeliveryDate": "2026-06-15"
 }
 ```
 
-### Evento publicado: `TrackingStatusChangedIntegrationEvent`
+### Evento publicado: `shipment.status.updated`
 
-Quando a projeção é criada ou atualizada por uma transição válida, o serviço grava uma mensagem na Outbox com tópico:
-
-```text
-tracking.events
-```
-
-Payload lógico:
+Quando a projeção é criada ou atualizada por uma transição válida, o serviço grava uma mensagem na Outbox para o tópico `shipment.status.updated`. O `KafkaIntegrationEventBus` não publica o DTO interno diretamente; ele monta o payload canônico abaixo dentro do envelope Kafka:
 
 ```json
 {
-  "messageId": "44444444-4444-4444-4444-444444444444",
   "shipmentId": "11111111-1111-1111-1111-111111111111",
+  "orderId": "22222222-2222-2222-2222-222222222222",
+  "buyerId": "33333333-3333-3333-3333-333333333333",
   "trackingCode": "BR123456789",
-  "carrierCode": "CORREIOS",
-  "previousStatus": "Created",
-  "currentStatus": "InTransit",
-  "location": {
-    "facilityCode": "CDD-SP-01",
-    "city": "São Paulo",
-    "state": "SP",
-    "country": "BR"
-  },
-  "occurredAt": "2026-06-10T10:15:00+00:00",
-  "estimatedDeliveryDate": "2026-06-12",
+  "carrierCode": "CARRIER_1",
+  "previousStatus": "in_transit",
+  "currentStatus": "delivered",
+  "statusDate": "2026-06-16T18:00:00Z",
+  "estimatedDeliveryDate": "2026-06-16",
   "exceptionCode": null
 }
 ```
+
+O DTO interno `TrackingStatusChangedIntegrationEvent` mantém `MessageId` e `CorrelationId` para a Outbox/envelope, mas o payload Kafka publicado expõe somente os campos canônicos necessários para os consumidores.
 
 ## Persistência e schema lógico
 

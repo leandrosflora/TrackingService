@@ -2,6 +2,8 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Confluent.Kafka;
 using Microsoft.Extensions.Options;
+using TrackingService.Contracts;
+using TrackingService.Domain;
 
 namespace TrackingService.Infrastructure.Messaging;
 
@@ -36,10 +38,11 @@ public sealed class KafkaIntegrationEventBus : IIntegrationEventBus, IDisposable
             throw new InvalidOperationException($"Kafka topic '{topic}' is not configured for TrackingService publication.");
 
         var eventType = ResolveEventType(topic, messageType);
-        var payloadElement = JsonSerializer.Deserialize<JsonElement>(payload, JsonOptions);
-        var correlationId = TryGetCorrelationId(payloadElement) ?? Guid.NewGuid().ToString("N");
-        var eventId = TryGetMessageId(payloadElement) ?? Guid.NewGuid();
-        var occurredAt = TryGetOccurredAt(payloadElement) ?? DateTimeOffset.UtcNow;
+        var internalPayloadElement = JsonSerializer.Deserialize<JsonElement>(payload, JsonOptions);
+        var payloadElement = BuildCanonicalPayload(topic, payload);
+        var correlationId = TryGetCorrelationId(internalPayloadElement) ?? Guid.NewGuid().ToString("N");
+        var eventId = TryGetMessageId(internalPayloadElement) ?? Guid.NewGuid();
+        var occurredAt = TryGetOccurredAt(internalPayloadElement) ?? TryGetStatusDate(payloadElement) ?? DateTimeOffset.UtcNow;
         var envelope = new IntegrationEventEnvelope(
             eventId,
             eventType,
@@ -86,6 +89,51 @@ public sealed class KafkaIntegrationEventBus : IIntegrationEventBus, IDisposable
         _producer.Dispose();
     }
 
+    private JsonElement BuildCanonicalPayload(string topic, string payload)
+    {
+        if (topic != _options.Topics.ShipmentStatusUpdated)
+            return JsonSerializer.Deserialize<JsonElement>(payload, JsonOptions);
+
+        var source = JsonSerializer.Deserialize<TrackingStatusChangedIntegrationEvent>(payload, JsonOptions)
+            ?? throw new InvalidOperationException("shipment.status.updated payload is empty.");
+
+        var canonicalPayload = new
+        {
+            shipmentId = source.ShipmentId,
+            orderId = source.OrderId,
+            buyerId = source.BuyerId,
+            trackingCode = source.TrackingCode,
+            carrierCode = source.CarrierCode,
+            previousStatus = ToCanonicalStatus(source.PreviousStatus),
+            currentStatus = ToCanonicalStatus(source.CurrentStatus),
+            statusDate = source.StatusDate,
+            estimatedDeliveryDate = source.EstimatedDeliveryDate,
+            exceptionCode = source.ExceptionCode
+        };
+
+        return JsonSerializer.SerializeToElement(canonicalPayload, JsonOptions);
+    }
+
+    private static string ToCanonicalStatus(TrackingStatus status)
+    {
+        return status switch
+        {
+            TrackingStatus.Created => "created",
+            TrackingStatus.LabelGenerated => "label_generated",
+            TrackingStatus.ReadyForPickup => "ready_for_pickup",
+            TrackingStatus.PickedUp => "picked_up",
+            TrackingStatus.InTransit => "in_transit",
+            TrackingStatus.AtDistributionCenter => "at_distribution_center",
+            TrackingStatus.OutForDelivery => "out_for_delivery",
+            TrackingStatus.DeliveryAttempted => "delivery_attempted",
+            TrackingStatus.Delivered => "delivered",
+            TrackingStatus.Exception => "exception",
+            TrackingStatus.Cancelled => "cancelled",
+            TrackingStatus.Returned => "returned",
+            _ => throw new ArgumentOutOfRangeException(nameof(status), status, "Unsupported tracking status.")
+        };
+    }
+
     private string ResolveEventType(string topic, string messageType)
     {
         if (topic == _options.Topics.ShipmentStatusUpdated)
@@ -104,6 +152,13 @@ public sealed class KafkaIntegrationEventBus : IIntegrationEventBus, IDisposable
     private static DateTimeOffset? TryGetOccurredAt(JsonElement payload)
     {
         if (payload.ValueKind == JsonValueKind.Object && payload.TryGetProperty("occurredAt", out var occurredAt) && occurredAt.TryGetDateTimeOffset(out var value))
+            return value;
+        return null;
+    }
+
+    private static DateTimeOffset? TryGetStatusDate(JsonElement payload)
+    {
+        if (payload.ValueKind == JsonValueKind.Object && payload.TryGetProperty("statusDate", out var statusDate) && statusDate.TryGetDateTimeOffset(out var value))
             return value;
         return null;
     }

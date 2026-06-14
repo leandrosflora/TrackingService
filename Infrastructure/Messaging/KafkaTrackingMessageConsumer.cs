@@ -106,18 +106,26 @@ public sealed class KafkaTrackingMessageConsumer : ITrackingMessageConsumer, IDi
         var envelope = JsonSerializer.Deserialize<IntegrationEventEnvelope>(result.Message.Value, JsonOptions)
             ?? throw new InvalidOperationException("Kafka event envelope is empty.");
 
-        if (envelope.EventType != _options.Topics.ShipmentCreated)
+        if (!string.Equals(envelope.EventType, "shipment.created", StringComparison.Ordinal))
             throw new InvalidOperationException($"Unsupported event type '{envelope.EventType}'.");
 
         var shipmentCreated = envelope.Payload.Deserialize<ShipmentCreatedIntegrationEvent>(JsonOptions)
             ?? throw new InvalidOperationException("shipment.created payload is empty.");
 
-        var occurredAt = shipmentCreated.CreatedAt ?? envelope.OccurredAt;
+        if (shipmentCreated.OrderId == Guid.Empty)
+            throw new InvalidOperationException("shipment.created payload must include orderId.");
+
+        if (shipmentCreated.BuyerId == Guid.Empty)
+            throw new InvalidOperationException("shipment.created payload must include buyerId.");
+
+        var occurredAt = shipmentCreated.CreatedAt;
         var trackingEvent = new CarrierTrackingEventIntegrationEvent(
             MessageId: envelope.EventId,
             CorrelationId: envelope.CorrelationId,
             ProviderEventId: $"shipment.created:{envelope.EventId:N}",
             ShipmentId: shipmentCreated.ShipmentId,
+            OrderId: shipmentCreated.OrderId,
+            BuyerId: shipmentCreated.BuyerId,
             TrackingCode: shipmentCreated.TrackingCode,
             CarrierCode: shipmentCreated.CarrierCode,
             CarrierSequence: 0,
