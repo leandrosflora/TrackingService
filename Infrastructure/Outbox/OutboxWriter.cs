@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using TrackingService.Application.Ports;
 using TrackingService.Infrastructure.Persistence;
 
@@ -7,6 +8,10 @@ namespace TrackingService.Infrastructure.Outbox;
 public sealed class OutboxWriter : IOutboxWriter
 {
     private readonly TrackingDbContext _dbContext;
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
+    {
+        Converters = { new JsonStringEnumConverter() }
+    };
 
     public OutboxWriter(TrackingDbContext dbContext)
     {
@@ -19,7 +24,7 @@ public sealed class OutboxWriter : IOutboxWriter
             topic,
             typeof(T).Name,
             aggregateKey,
-            JsonSerializer.Serialize(message));
+            JsonSerializer.Serialize(message, JsonOptions));
 
         await _dbContext.OutboxMessages.AddAsync(outboxMessage, cancellationToken);
     }

@@ -4,6 +4,7 @@ namespace TrackingService.Contracts;
 
 public sealed record CarrierTrackingEventIntegrationEvent(
     Guid MessageId,
+    string CorrelationId,
     string ProviderEventId,
     Guid ShipmentId,
     string TrackingCode,

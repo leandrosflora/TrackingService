@@ -71,10 +71,11 @@ public sealed class TrackingEventHandler
         if (projectionChanged)
         {
             await _outbox.AddAsync(
-                topic: "tracking.events",
+                topic: "shipment.status.updated",
                 aggregateKey: integrationEvent.ShipmentId.ToString(),
                 message: new TrackingStatusChangedIntegrationEvent(
                     MessageId: Guid.NewGuid(),
+                    CorrelationId: integrationEvent.CorrelationId,
                     ShipmentId: integrationEvent.ShipmentId,
                     TrackingCode: trackingEvent.TrackingCode,
                     CarrierCode: trackingEvent.CarrierCode,
