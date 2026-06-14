@@ -79,7 +79,12 @@ public sealed class KafkaTrackingMessageConsumer : ITrackingMessageConsumer, IDi
 
     public Task CommitAsync(ConsumedTrackingMessage message, CancellationToken cancellationToken)
     {
-        _consumer.Commit(new TopicPartitionOffset(message.Topic, new Partition(message.Partition), new Offset(message.Offset + 1)));
+        var topicPartitionOffset = new TopicPartitionOffset(
+            message.Topic,
+            new Partition(message.Partition),
+            new Offset(message.Offset + 1));
+
+        _consumer.Commit(new[] { topicPartitionOffset });
         _logger.LogDebug("Committed Kafka message {Topic}/{Partition}/{Offset}", message.Topic, message.Partition, message.Offset);
         return Task.CompletedTask;
     }
