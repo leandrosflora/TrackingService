@@ -77,12 +77,14 @@ public sealed class TrackingEventHandler
                     MessageId: Guid.NewGuid(),
                     CorrelationId: integrationEvent.CorrelationId,
                     ShipmentId: integrationEvent.ShipmentId,
+                    OrderId: integrationEvent.OrderId,
+                    BuyerId: integrationEvent.BuyerId,
                     TrackingCode: trackingEvent.TrackingCode,
                     CarrierCode: trackingEvent.CarrierCode,
                     PreviousStatus: previousStatus ?? TrackingStatus.Created,
                     CurrentStatus: trackingEvent.Status,
                     Location: integrationEvent.Location,
-                    OccurredAt: trackingEvent.OccurredAt,
+                    StatusDate: trackingEvent.OccurredAt,
                     EstimatedDeliveryDate: trackingEvent.EstimatedDeliveryDate,
                     ExceptionCode: trackingEvent.ExceptionCode),
                 cancellationToken);
@@ -119,6 +121,8 @@ public sealed class TrackingEventHandler
 
         return new TrackingEvent(
             source.ShipmentId,
+            source.OrderId,
+            source.BuyerId,
             source.ProviderEventId,
             source.TrackingCode,
             source.CarrierCode,

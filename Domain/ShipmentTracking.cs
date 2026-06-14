@@ -3,6 +3,8 @@ namespace TrackingService.Domain;
 public sealed class ShipmentTracking
 {
     public Guid ShipmentId { get; private set; }
+    public Guid OrderId { get; private set; }
+    public Guid BuyerId { get; private set; }
     public string TrackingCode { get; private set; } = default!;
     public string CarrierCode { get; private set; } = default!;
     public TrackingStatus CurrentStatus { get; private set; }
@@ -29,6 +31,8 @@ public sealed class ShipmentTracking
         return new ShipmentTracking
         {
             ShipmentId = trackingEvent.ShipmentId,
+            OrderId = trackingEvent.OrderId,
+            BuyerId = trackingEvent.BuyerId,
             TrackingCode = trackingEvent.TrackingCode,
             CarrierCode = trackingEvent.CarrierCode,
             CurrentStatus = trackingEvent.Status,
@@ -48,6 +52,8 @@ public sealed class ShipmentTracking
 
     public void Apply(TrackingEvent trackingEvent)
     {
+        OrderId = trackingEvent.OrderId;
+        BuyerId = trackingEvent.BuyerId;
         CurrentStatus = trackingEvent.Status;
         LastEventId = trackingEvent.Id;
         LastCarrierSequence = trackingEvent.CarrierSequence;

@@ -7,6 +7,10 @@ public sealed class MockTrackingRepository : ITrackingRepository
 {
     private static readonly Guid ShipmentInTransitId = Guid.Parse("11111111-1111-1111-1111-111111111111");
     private static readonly Guid ShipmentDeliveredId = Guid.Parse("22222222-2222-2222-2222-222222222222");
+    private static readonly Guid OrderInTransitId = Guid.Parse("33333333-3333-3333-3333-333333333333");
+    private static readonly Guid BuyerInTransitId = Guid.Parse("44444444-4444-4444-4444-444444444444");
+    private static readonly Guid OrderDeliveredId = Guid.Parse("55555555-5555-5555-5555-555555555555");
+    private static readonly Guid BuyerDeliveredId = Guid.Parse("66666666-6666-6666-6666-666666666666");
 
     private static readonly IReadOnlyList<TrackingEvent> Events = BuildEvents();
     private static readonly IReadOnlyList<ShipmentTracking> Trackings = BuildTrackings();
@@ -53,6 +57,8 @@ public sealed class MockTrackingRepository : ITrackingRepository
         {
             new TrackingEvent(
                 ShipmentInTransitId,
+                OrderInTransitId,
+                BuyerInTransitId,
                 "mock-mlb-001-created",
                 "MLB-MOCK-IN-TRANSIT",
                 "MELI",
@@ -66,6 +72,8 @@ public sealed class MockTrackingRepository : ITrackingRepository
                 DateOnly.Parse("2026-06-18")),
             new TrackingEvent(
                 ShipmentInTransitId,
+                OrderInTransitId,
+                BuyerInTransitId,
                 "mock-mlb-001-picked-up",
                 "MLB-MOCK-IN-TRANSIT",
                 "MELI",
@@ -79,6 +87,8 @@ public sealed class MockTrackingRepository : ITrackingRepository
                 DateOnly.Parse("2026-06-18")),
             new TrackingEvent(
                 ShipmentInTransitId,
+                OrderInTransitId,
+                BuyerInTransitId,
                 "mock-mlb-001-in-transit",
                 "MLB-MOCK-IN-TRANSIT",
                 "MELI",
@@ -92,6 +102,8 @@ public sealed class MockTrackingRepository : ITrackingRepository
                 DateOnly.Parse("2026-06-18")),
             new TrackingEvent(
                 ShipmentDeliveredId,
+                OrderDeliveredId,
+                BuyerDeliveredId,
                 "mock-mlb-002-created",
                 "MLB-MOCK-DELIVERED",
                 "MELI",
@@ -105,6 +117,8 @@ public sealed class MockTrackingRepository : ITrackingRepository
                 DateOnly.Parse("2026-06-13")),
             new TrackingEvent(
                 ShipmentDeliveredId,
+                OrderDeliveredId,
+                BuyerDeliveredId,
                 "mock-mlb-002-delivered",
                 "MLB-MOCK-DELIVERED",
                 "MELI",
