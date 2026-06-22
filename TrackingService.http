@@ -1,6 +1,50 @@
 @TrackingService_HostAddress = http://localhost:5200
+@CorrelationId = 11111111111111111111111111111111
+@ShipmentId = 11111111-1111-1111-1111-111111111111
+@TrackingCode = MLB-MOCK-IN-TRANSIT
 
-GET {{TrackingService_HostAddress}}/weatherforecast/
+GET {{TrackingService_HostAddress}}/health/live
 Accept: application/json
 
 ###
+
+GET {{TrackingService_HostAddress}}/health/ready
+Accept: application/json
+
+###
+
+GET {{TrackingService_HostAddress}}/v1/tracking/{{TrackingCode}}
+Accept: application/json
+X-Correlation-Id: {{CorrelationId}}
+
+###
+
+GET {{TrackingService_HostAddress}}/v1/tracking/shipments/{{ShipmentId}}
+Accept: application/json
+X-Correlation-Id: {{CorrelationId}}
+
+###
+
+POST {{TrackingService_HostAddress}}/v1/tracking/events
+Content-Type: application/json
+X-Correlation-Id: {{CorrelationId}}
+
+{
+  "providerEventId": "carrier-event-123",
+  "shipmentId": "11111111-1111-1111-1111-111111111111",
+  "orderId": "33333333-3333-3333-3333-333333333333",
+  "buyerId": "44444444-4444-4444-4444-444444444444",
+  "trackingCode": "MLB-MOCK-IN-TRANSIT",
+  "carrierCode": "MELI",
+  "carrierSequence": 4,
+  "status": "OutForDelivery",
+  "description": "Pacote saiu para entrega.",
+  "occurredAt": "2026-06-22T10:15:00Z",
+  "estimatedDeliveryDate": "2026-06-22",
+  "location": {
+    "facilityCode": "XD-SP01",
+    "city": "São Paulo",
+    "state": "SP",
+    "country": "BR"
+  }
+}

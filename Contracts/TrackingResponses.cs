@@ -11,7 +11,8 @@ public sealed record ShipmentTrackingResponse(
     DateTimeOffset LastEventOccurredAt,
     DateOnly? EstimatedDeliveryDate,
     DateTimeOffset? DeliveredAt,
-    string? CurrentExceptionCode);
+    string? CurrentExceptionCode,
+    IReadOnlyList<TrackingEventResponse> Events);
 
 public sealed record TrackingEventResponse(
     Guid EventId,
